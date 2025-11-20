@@ -1,0 +1,3 @@
+module network-testing-util
+
+go 1.24.4
