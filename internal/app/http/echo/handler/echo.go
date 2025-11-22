@@ -1,23 +1,22 @@
-package handlers
+package handler
 
 import (
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
+	"network-testing-util/internal/domain"
 	"time"
-
-	"network-testing-util/internal/types"
 )
 
-type RequestHandler struct{}
+type EchoHandler struct{}
 
-func NewRequestHandler() *RequestHandler {
-	return &RequestHandler{}
+func NewEchoHandler() *EchoHandler {
+	return &EchoHandler{}
 }
 
-func (h *RequestHandler) Handle(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, types.MaxBodySize)
+func (h *EchoHandler) Handle(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, domain.MaxBodySize)
 
 	bodyBytes, err := io.ReadAll(r.Body)
 	bodyTruncated := false
@@ -25,7 +24,7 @@ func (h *RequestHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		if _, ok := err.(*http.MaxBytesError); ok {
-			log.Printf("⚠️  Request body too large from %s (max: %d bytes)", r.RemoteAddr, types.MaxBodySize)
+			log.Printf("⚠️  Request body too large from %s (max: %d bytes)", r.RemoteAddr, domain.MaxBodySize)
 			bodyTruncated = true
 			bodyBytes = []byte("Body exceeded maximum size limit")
 			statusCode = http.StatusRequestEntityTooLarge
@@ -36,7 +35,7 @@ func (h *RequestHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	reqInfo := types.RequestInfo{
+	reqInfo := response{
 		Timestamp:     time.Now().Format(time.RFC3339),
 		Method:        r.Method,
 		URL:           r.URL.String(),

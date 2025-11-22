@@ -1,31 +1,32 @@
-package handlers
+package handler
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"network-testing-util/internal/clients/http/common"
+	"network-testing-util/internal/domain"
+	"network-testing-util/internal/domain/models"
 	"strings"
 	"time"
 
-	"network-testing-util/internal/httpclient"
 	"network-testing-util/internal/security"
-	"network-testing-util/internal/types"
 )
 
-type ClientHandler struct {
+type RequestHandler struct {
 	validator  *security.Validator
-	httpClient *httpclient.Client
+	httpClient *common.Client
 }
 
-func NewClientHandler(validator *security.Validator, httpClient *httpclient.Client) *ClientHandler {
-	return &ClientHandler{
+func NewRequestHandler(validator *security.Validator, httpClient *common.Client) *RequestHandler {
+	return &RequestHandler{
 		validator:  validator,
 		httpClient: httpClient,
 	}
 }
 
-func (h *ClientHandler) Handle(w http.ResponseWriter, r *http.Request) {
+func (h *RequestHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
 
 	targetURL := r.URL.Query().Get("url")
@@ -39,7 +40,7 @@ func (h *ClientHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.validator.ValidateURL(targetURL); err != nil {
-		response := types.HTTPClientResponse{
+		response := models.HTTPClientResponse{
 			Timestamp:     time.Now().Format(time.RFC3339),
 			RequestMethod: r.URL.Path[len("/http/"):],
 			RequestURL:    targetURL,
@@ -48,33 +49,33 @@ func (h *ClientHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 		return
 	}
 
 	method := strings.ToUpper(r.URL.Path[len("/http/"):])
 
-	r.Body = http.MaxBytesReader(w, r.Body, types.MaxBodySize)
+	r.Body = http.MaxBytesReader(w, r.Body, domain.MaxBodySize)
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		if _, ok := err.(*http.MaxBytesError); ok {
-			response := types.HTTPClientResponse{
+			response := models.HTTPClientResponse{
 				Timestamp:     time.Now().Format(time.RFC3339),
 				RequestMethod: method,
 				RequestURL:    targetURL,
-				Error:         fmt.Sprintf("Request body too large (max: %d bytes)", types.MaxBodySize),
+				Error:         fmt.Sprintf("Request body too large (max: %d bytes)", domain.MaxBodySize),
 				Duration:      time.Since(startTime).String(),
 			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
-			json.NewEncoder(w).Encode(response)
-			r.Body.Close()
+			_ = json.NewEncoder(w).Encode(response)
+			_ = r.Body.Close()
 			return
 		}
 	}
 	defer r.Body.Close()
 
-	response, err := h.httpClient.Do(method, targetURL, bodyBytes, r.Header)
+	httpClientResponse, err := h.httpClient.Do(method, targetURL, bodyBytes, r.Header)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
@@ -85,7 +86,7 @@ func (h *ClientHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(response); err != nil {
+	if err := encoder.Encode(httpClientResponse); err != nil {
 		http.Error(w, "Error encoding response", http.StatusInternalServerError)
 	}
 }

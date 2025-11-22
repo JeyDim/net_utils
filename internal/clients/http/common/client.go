@@ -1,4 +1,4 @@
-package httpclient
+package common
 
 import (
 	"bytes"
@@ -7,10 +7,11 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"network-testing-util/internal/domain"
+	"network-testing-util/internal/domain/models"
 	"time"
 
 	"network-testing-util/internal/security"
-	"network-testing-util/internal/types"
 )
 
 type Client struct {
@@ -27,7 +28,7 @@ func NewClient(validator *security.Validator) *Client {
 	}
 }
 
-func (c *Client) Do(method, targetURL string, bodyBytes []byte, headers http.Header) (*types.HTTPClientResponse, error) {
+func (c *Client) Do(method, targetURL string, bodyBytes []byte, headers http.Header) (*models.HTTPClientResponse, error) {
 	startTime := time.Now()
 
 	var req *http.Request
@@ -40,7 +41,7 @@ func (c *Client) Do(method, targetURL string, bodyBytes []byte, headers http.Hea
 	}
 
 	if err != nil {
-		return &types.HTTPClientResponse{
+		return &models.HTTPClientResponse{
 			Timestamp:     time.Now().Format(time.RFC3339),
 			RequestMethod: method,
 			RequestURL:    targetURL,
@@ -87,7 +88,7 @@ func (c *Client) Do(method, targetURL string, bodyBytes []byte, headers http.Hea
 	resp, err := client.Do(req)
 	duration := time.Since(startTime)
 
-	response := &types.HTTPClientResponse{
+	response := &models.HTTPClientResponse{
 		Timestamp:      time.Now().Format(time.RFC3339),
 		RequestMethod:  method,
 		RequestURL:     targetURL,
@@ -115,12 +116,12 @@ func (c *Client) Do(method, targetURL string, bodyBytes []byte, headers http.Hea
 		defer gr.Close()
 		resp.Body = gr
 	}
-	respBodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, types.MaxBodySize))
+	respBodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, domain.MaxBodySize))
 	if err != nil {
 		response.Body = ""
 	} else {
 		response.Body = string(respBodyBytes)
-		if int64(len(respBodyBytes)) >= types.MaxBodySize {
+		if int64(len(respBodyBytes)) >= domain.MaxBodySize {
 			response.BodyTruncated = true
 			response.Body = response.Body + "... (truncated)"
 		}
