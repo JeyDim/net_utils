@@ -35,5 +35,6 @@ USER appuser
 COPY --from=build /bin/server /bin/
 
 EXPOSE 5000
+EXPOSE 6000
 
 ENTRYPOINT [ "/bin/server" ]
